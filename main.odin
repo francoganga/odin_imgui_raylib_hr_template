@@ -9,15 +9,18 @@ import "core:os"
 import "core:strings"
 
 import rl "lib/raylib"
+import imgui "lib/imgui_raylib/odin-imgui"
+import imgui_rl "lib/imgui_raylib"
 
 lib_name :: "game.so"
 
 GameAPI :: struct {
 	init:         proc(),
-	update:       proc() -> bool,
+	update:       proc(ctx: ^imgui.Context) -> bool,
 	shutdown:     proc(),
 	memory:       proc() -> rawptr,
 	hot_reloaded: proc(_: rawptr),
+    game_imgui_reload: proc(mem_alloc: ^imgui.MemAllocFunc, mem_free: ^imgui.MemFreeFunc, user_data: rawptr, ctx: ^imgui.Context),
 	lib:          dynlib.Library,
 	dll_time:     os.File_Time,
 	api_version:  int,
@@ -69,13 +72,19 @@ load_game_api :: proc(api_version: int) -> (GameAPI, bool) {
   cast them to the correct signatures. */
 	api := GameAPI {
 		init         = cast(proc())(dynlib.symbol_address(lib, "game_init") or_else nil),
-		update       = cast(proc() -> bool)(dynlib.symbol_address(lib, "game_update") or_else nil),
+		update       = cast(proc(ctx: ^imgui.Context) -> bool)(dynlib.symbol_address(lib, "game_update") or_else nil),
 		shutdown     = cast(proc())(dynlib.symbol_address(lib, "game_shutdown") or_else nil),
 		memory       = cast(proc(
 		) -> rawptr)(dynlib.symbol_address(lib, "game_memory") or_else nil),
 		hot_reloaded = cast(proc(
 			_: rawptr,
 		))(dynlib.symbol_address(lib, "game_hot_reloaded") or_else nil),
+        game_imgui_reload = cast(proc(
+            mem_alloc: ^imgui.MemAllocFunc,
+            mem_free: ^imgui.MemFreeFunc,
+            user_data: rawptr,
+            ctx: ^imgui.Context,
+        ))(dynlib.symbol_address(lib, "game_imgui_reload") or_else nil),
 		lib          = lib,
 		dll_time     = dll_time,
 		api_version  = api_version,
@@ -84,7 +93,8 @@ load_game_api :: proc(api_version: int) -> (GameAPI, bool) {
 	   api.update == nil ||
 	   api.shutdown == nil ||
 	   api.memory == nil ||
-	   api.hot_reloaded == nil {
+	   api.hot_reloaded == nil ||
+       api.game_imgui_reload == nil {
 		dynlib.unload_library(api.lib)
 		fmt.println("Game DLL missing required procedure")
 		return {}, false
@@ -128,10 +138,26 @@ main :: proc() {
 
 	fmt.println("Game API loaded")
 
+    // TODO add imgui to dll
 	rl.InitWindow(800, 600, "Raylib")
+    defer rl.CloseWindow()
+    imgui.CreateContext(nil)
+	defer imgui.DestroyContext(nil)
+	imgui_rl.init()
+	defer imgui_rl.shutdown()
+	imgui_rl.build_font_atlas()
+	rl.SetTargetFPS(60)
+
+    ctx := imgui.GetCurrentContext()
+
+    mem_alloc: imgui.MemAllocFunc
+    mem_free: imgui.MemFreeFunc
+    user_data: rawptr
+
+    imgui.GetAllocatorFunctions(&mem_alloc, &mem_free, &user_data)
 
 	for {
-		if game_api.update() == false {
+		if game_api.update(ctx) == false {
 			break
 		}
 
@@ -167,6 +193,7 @@ main :: proc() {
 				/* Tell the new game API to use the old
                 one's game memory. */
 				game_api.hot_reloaded(game_memory)
+                game_api.game_imgui_reload(&mem_alloc, &mem_free, user_data, ctx)
 
 				game_api_version += 1
 			}
