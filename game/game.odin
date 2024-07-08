@@ -16,7 +16,8 @@ ImguiMemory :: struct {
 
 GameMemory :: struct {
     imgui: ^ImguiMemory,
-    count: int
+    count: int,
+    color: rl.Color
 }
 
 g_mem: ^GameMemory
@@ -48,17 +49,27 @@ game_update :: proc(ctx: ^imgui.Context) -> bool {
 	imgui.NewFrame()
 	rl.BeginDrawing()
     text := fmt.ctprintf("Count: {0}", g_mem.count)
-	rl.DrawText(text, 100, 100, 20, rl.RED)
 	rl.ClearBackground(rl.BLACK)
+
+    rl.DrawRectangle(10, 10, 100, 100, g_mem.color)
+    rl.DrawText(text, 10, 10, 20, rl.WHITE)
 	//imgui.ShowDemoWindow(nil)
-    text2 := fmt.ctprintf("Debug: {0}", g_mem.count)
+    text2 := fmt.ctprintf("Hello: {0}", g_mem.count)
     if imgui.Button(text2, {80, 40}) {
         g_mem.count += 1
     }
     imgui.SameLine()
-    if imgui.Button("Reset", {110, 40}) {
+    if imgui.Button("Restart", {110, 40}) {
         g_mem.count = 0
     }
+    imgui.SameLine()
+    if imgui.Button("BLUE", {110, 40}) {
+        g_mem.color = rl.BLUE
+    }
+    if imgui.Button("MAGENTA", {110, 40}) {
+        g_mem.color = rl.MAGENTA
+    }
+
 
 
 	imgui.Render()

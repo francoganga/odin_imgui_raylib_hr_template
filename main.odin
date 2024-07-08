@@ -134,11 +134,9 @@ main :: proc() {
 
 	game_api_version += 1
 	game_api.init()
-	//game_api.init_window()
 
 	fmt.println("Game API loaded")
 
-    // TODO add imgui to dll
 	rl.InitWindow(800, 600, "Raylib")
     defer rl.CloseWindow()
     imgui.CreateContext(nil)
